@@ -19,19 +19,19 @@ loadGame fname = do handle <- openFile fname ReadMode
 
 --initializes solution structure
 --usage: initiateSolution num_of_cols num_of_rows
-initiateSolution :: Int -> Int ->[String]
+initiateSolution :: Int -> Int ->[[Int]]
 initiateSolution c r = if r < 1 then []
                        else [initiateRow c] ++ initiateSolution c (r-1) 
 
 --initializes one row of solution
 --usage: initiateRow num_of_cols curr_col
-initiateRow :: Int -> String
+initiateRow :: Int -> [Int]
 initiateRow c= if c < 1 then []
-                  else "00"++initiateRow (c-1)
+                  else [8]++initiateRow (c-1)
 
 --print whole game
 --usage: printGame game solution
-printGame :: Nono -> [String] -> IO()
+printGame :: Nono -> [[Int]] -> IO()
 printGame (N c r x y) s = do let mc = countMaxNumOfCmd x
                              putStrLn("Max number of commands in column: " ++ show mc)
                              let mr = countMaxNumOfCmd y
@@ -72,22 +72,27 @@ countMaxNumOfCmd ((x,y,z):(xs,ys,zs):xss) = if x == xs then
 
 --prints row cmds and solution
 --usage: printRows row_cmds solution curr_row num_of_rows max_num_of_cmds_in_row
-printRows :: [(Int,Int,Color)] -> [String] -> Int -> Int -> Int -> IO()
+printRows :: [(Int,Int,Color)] -> [[Int]] -> Int -> Int -> Int -> IO()
 printRows x s a r mr = if a<=r then do printRow x (head s) a mr (countNumOfCmd x a)
                                        printRows x (tail s) (a+1) r mr
                        else putStr("\n")
 
 --prints single row
 --usage: printRow row_cmds curr_row_solution curr_row_num max_num_of_cmds_in_row num_of_cmds_in_row
-printRow :: [(Int,Int,Color)] -> String -> Int -> Int -> Int -> IO()
-printRow [] s _ _ _ = putStr(s ++ "\n")
+printRow :: [(Int,Int,Color)] -> [Int] -> Int -> Int -> Int -> IO()
+printRow [] [] _ _ _ = putStrLn("")
+printRow [] (s:ss) _ _ _ = if s == 8 then do putStr("_ ")
+                                             printRow [] ss 0 0 0
+                           else do putCharWithColor 'X' (toEnum s :: Color)
+                                   putStr(" ")
+                                   printRow [] ss 0 0 0
 printRow ((a,b,c):xs) s r mr n = if a == r then
                                         if mr == n then do if b<10 then putCharWithColor (intToDigit b) c
                                                            else putCharWithColor (chr (b+87)) c
                                                            printRow xs s r mr n
                                         else do putStr(" ")
                                                 printRow ((a,b,c):xs) s r mr (n+1)
-                                 else if a > r then putStr(s ++ "\n")
+                                 else if a > r then printRow [] s r mr n
                                       else printRow xs s r mr n
 
 --count number of cmds in row/col
