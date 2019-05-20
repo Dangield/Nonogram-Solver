@@ -12,7 +12,7 @@ loadGame :: String -> IO()
 loadGame fname = do handle <- openFile fname ReadMode
                     contents <- hGetContents handle
                     let (c:r:x) = splitOn ";" contents
-                    let n = N (read c :: Int) (read r :: Int) (loadCols (splitOn "|" (head x))) (loadCols (splitOn "|" (head (tail x))))
+                    let n = N (read c :: Int) (read r :: Int) (enrichCmds (loadCols (splitOn "|" (head x)))) (enrichCmds (loadCols (splitOn "|" (head (tail x)))))
                     putStr(nonoToString n)
                     let s = initiateSolution (read c :: Int) (read r :: Int)
                     printGame n s
@@ -121,6 +121,13 @@ loadCols (s:ss) = [getCol(s)] ++ loadCols ss
 getCol :: String -> (Int,Int,Color)
 getCol s = do let x = splitOn "," s
               (read (head x) :: Int,read (head (tail x)) :: Int, toEnum(read (head (tail (tail x))) :: Int) :: Color)
+
+--adds single White cmd between 2 cmds of the same Color in the same row/col
+--usage: enrichCmds col/row_cmds
+enrichCmds :: [(Int,Int,Color)] -> [(Int,Int,Color)]
+enrichCmds [(x1,x2,x3)] = [(x1,x2,x3)]
+enrichCmds ((x1,x2,x3):(xs1,xs2,xs3):xss) = if (x1==xs1 && x3==xs3) then [(x1,x2,x3),(x1,1,toEnum 7 :: Color)] ++ enrichCmds ((xs1,xs2,xs3):xss)
+                                          else [(x1,x2,x3)] ++ enrichCmds ((xs1,xs2,xs3):xss)
 
 --prints single char in chosen color
 --usage: putCharWithColor char color
