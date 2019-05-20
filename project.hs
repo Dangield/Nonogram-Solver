@@ -16,6 +16,13 @@ loadGame fname = do handle <- openFile fname ReadMode
                     putStr(nonoToString n)
                     let s = initiateSolution (read c :: Int) (read r :: Int)
                     printGame n s
+                    putStrLn(show (getRowsEligibility n s [1..read r :: Int]))
+                    putStrLn("----------------------------------")
+                    putStrLn(show (getColsEligibility n s [1..read c :: Int]))
+                    putStrLn("----------------------------------")
+                    putStrLn(show (rotateSolution s))
+                    putStrLn(show (firstAttempt n s))
+                    printGame n (firstAttempt n s)
 
 --initializes solution structure
 --usage: initiateSolution num_of_cols num_of_rows
@@ -136,3 +143,41 @@ putCharWithColor x c = do
     setSGR [SetColor Foreground Vivid c]
     putChar x
     setSGR [Reset]
+
+getRowsEligibility :: Nono -> [[Int]] -> [Int] -> [Bool]
+getRowsEligibility _ _ [] = []
+getRowsEligibility (N c r xc xr) (s:ss) (rs:rss) = [maximum d > r - sum d] ++ (getRowsEligibility (N c r xc xr) ss rss)
+                                                   where d = [x2 | (x1,x2,x3)<-xr, x1==rs]
+                                                         r = length (filter (==8) s)
+
+getColsEligibility :: Nono -> [[Int]] -> [Int] -> [Bool]
+getColsEligibility (N c r xc xr) s n = getRowsEligibility (N r c xr xc) (rotateSolution s) n
+
+rotateSolution :: [[Int]] -> [[Int]]
+rotateSolution ([]:_) = []
+rotateSolution x = ([head y | y<-x]:rotateSolution [tail y | y<-x])
+
+firstAttempt :: Nono -> [[Int]] -> [[Int]]
+firstAttempt (N c r xc xr) s = do let re = getRowsEligibility (N c r xc xr) s [1..r]
+                                  let s1 = fillRows xr s re [1..r]
+                                  let ce = getColsEligibility (N c r xc xr) s [1..c]
+                                  rotateSolution (fillRows xc (rotateSolution s1) ce [1..c])
+
+fillRows :: [(Int,Int,Color)] -> [[Int]] -> [Bool] -> [Int] -> [[Int]]
+fillRows _ _ _ [] = []
+fillRows c (s:ss) (e:es) (n:ns) = do let d = [x2 | (x1,x2,x3)<- c,x1 == n]
+                                     let x = [(x1,x2,x3) | (x1,x2,x3)<- c,x1 == n]
+                                     if sum d == length s then [fillFullRow x] ++ fillRows c ss es ns
+                                     else if e then [fillRow x s (length s - sum d)] ++ fillRows c ss es ns
+                                          else [s] ++ fillRows c ss es ns
+
+fillRow :: [(Int,Int,Color)] -> [Int] -> Int -> [Int]
+fillRow _ [] _ = []
+fillRow [] s _ = s
+fillRow ((c1,c2,c3):cs) s e = if c2 > e then (take e s) ++ fillFullRow [(c1,c2-e,c3)] ++ fillRow cs (drop c2 s) e
+                              else (take c2 s) ++ fillRow cs (drop c2 s) e
+
+fillFullRow :: [(Int,Int,Color)] -> [Int]
+fillFullRow [] = []
+fillFullRow ((c1,c2,c3):cs) = if c2 == 0 then fillFullRow cs
+                              else [fromEnum c3] ++ fillFullRow ((c1,c2-1,c3):cs)
