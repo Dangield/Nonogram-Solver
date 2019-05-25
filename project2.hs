@@ -4,13 +4,15 @@ import Data.List.Split
 import Data.Char
 import Data.List
 
-data Nono = N Int Int [[(Int,Color)]] [[(Int,Color)]] [[[Color]]] deriving Show
+data Nono = N Int Int [[(Int,Color)]] [[(Int,Color)]] [Color] [[[Color]]] deriving Show
 
 solve :: String -> IO ()
 solve fname = do handle <- openFile fname ReadMode
                  contents <- hGetContents handle
                  let n = getNonoFromString contents
+                 putStrLn("First look at the game.")
                  printGame n
+                 fillSafeSpaces n
 
 --retrieving nonogram from file
 getNonoFromString :: String -> Nono
@@ -20,7 +22,7 @@ getNonoFromString s = do let args = splitOn ";" s
                          let cx = getCmdsFromStrings (splitOn "|" (args !! 2))
                          let rx = getCmdsFromStrings (splitOn "|" (args !! 3))
                          let col = [White] ++ getColorsInNono (cx ++ rx)
-                         N c r (enrichCmds (splitCmds cx)) (enrichCmds (splitCmds rx)) (initSolution c r col)
+                         N c r (enrichCmds (splitCmds cx)) (enrichCmds (splitCmds rx)) col (initSolution c r col)
 
 getCmdsFromStrings :: [String] -> [(Int,Int,Color)]
 getCmdsFromStrings [] = []
@@ -50,10 +52,10 @@ initSolution c r col = take r (repeat (take c (repeat col)))
 
 --printing game in console
 printGame :: Nono -> IO ()
-printGame (N c r cx rx s) = do let mc = maximum ([length x| x<-cx])
-                               let mr = maximum ([length x| x<-rx])
-                               printColsCmds c cx mc mr
-                               printRowsCmds r rx s mr
+printGame (N c r cx rx _ s) = do let mc = maximum ([length x| x<-cx])
+                                 let mr = maximum ([length x| x<-rx])
+                                 printColsCmds c cx mc mr
+                                 printRowsCmds r rx s mr
 
 printColsCmds :: Int -> [[(Int,Color)]] -> Int -> Int -> IO ()
 printColsCmds _ _ 0 _ = putStr("")
@@ -94,3 +96,29 @@ putCharWithColor x c = do setSGR [SetColor Foreground Vivid c]
                           putChar x
                           setSGR [Reset]
 
+--solve the nonogram - filling safe spaces
+fillSafeSpaces :: Nono -> IO ()
+fillSafeSpaces (N c r cx rx col s) = do let s1 = fillSafeSpacesInRows (N c r cx rx col s)
+                                        putStrLn("Safe spaces in rows filled.")
+                                        printGame (N c r cx rx col s1)
+                                        let s2 = fillSafeSpacesInCols (N c r cx rx col s1)
+                                        putStrLn("Safe spaces in cols filled.")
+                                        printGame (N c r cx rx col s2)
+
+fillSafeSpacesInRows :: Nono -> [[[Color]]]
+fillSafeSpacesInRows (N _ _ _ [] _ []) = []
+fillSafeSpacesInRows (N c r cx (rx:rxs) col (s:ss)) = do let e = c - sum [x1 | (x1,x2)<-rx]
+                                                         if e < maximum [x1 | (x1,x2)<-rx] then [fillSafeSpacesInRow e rx s]++fillSafeSpacesInRows (N c r cx rxs col ss)
+                                                         else [s]++fillSafeSpacesInRows (N c r cx rxs col ss)
+
+fillSafeSpacesInRow :: Int -> [(Int,Color)] -> [[Color]] -> [[Color]]
+fillSafeSpacesInRow e [] s = s
+fillSafeSpacesInRow e ((rx1,rx2):rxs) s = if rx1 > e then (take e s) ++ (take (rx1-e) (repeat [rx2])) ++ (fillSafeSpacesInRow e rxs (drop rx1 s))
+                                          else (take rx1 s) ++ (fillSafeSpacesInRow e rxs (drop rx1 s))
+
+fillSafeSpacesInCols :: Nono -> [[[Color]]]
+fillSafeSpacesInCols (N c r cx rx col s) = rotateSolution (fillSafeSpacesInRows (N r c rx cx col (rotateSolution s)))
+
+rotateSolution :: [[[Color]]] -> [[[Color]]]
+rotateSolution ([]:_) = []
+rotateSolution s = ([head x | x<-s]:rotateSolution [tail x | x<-s])
