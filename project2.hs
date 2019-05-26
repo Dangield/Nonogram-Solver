@@ -104,6 +104,7 @@ fillSafeSpaces (N c r cx rx col s) = do let s1 = fillSafeSpacesInRows (N c r cx 
                                         let s2 = fillSafeSpacesInCols (N c r cx rx col s1)
                                         putStrLn("Safe spaces in cols filled.")
                                         printGame (N c r cx rx col s2)
+                                        tryForSolution (N c r cx rx col s2)
 
 fillSafeSpacesInRows :: Nono -> [[[Color]]]
 fillSafeSpacesInRows (N _ _ _ [] _ []) = []
@@ -122,3 +123,38 @@ fillSafeSpacesInCols (N c r cx rx col s) = rotateSolution (fillSafeSpacesInRows 
 rotateSolution :: [[[Color]]] -> [[[Color]]]
 rotateSolution ([]:_) = []
 rotateSolution s = ([head x | x<-s]:rotateSolution [tail x | x<-s])
+
+--solve the nonogram - main loop
+tryForSolution :: Nono -> IO ()
+tryForSolution (N c r cx rx col s) = do putStrLn("Starting new cycle of trying for solution.")
+                                        let s1 = removeUnnecessaryColors (N c r cx rx col s)
+                                        putStrLn("Solution after removing colors.")
+                                        printGame (N c r cx rx col s1)
+                                        --TODO
+                                        --TODO
+                                        let col1 = removeCompletedColors (N c r cx rx col s1)
+                                        putStr("Remaining color pallet:")
+                                        putStrLn(show col1)
+
+--solve the nonogram - main loop - first check
+removeUnnecessaryColors :: Nono -> [[[Color]]]
+removeUnnecessaryColors (N c r cx rx col s) = rotateSolution (removeUnnecessaryColorsFromRows cx col (rotateSolution (removeUnnecessaryColorsFromRows rx col s)))
+
+removeUnnecessaryColorsFromRows :: [[(Int,Color)]] -> [Color] -> [[[Color]]] -> [[[Color]]]
+removeUnnecessaryColorsFromRows [] _ _ = []
+removeUnnecessaryColorsFromRows _ [] (s:ss) = [s]
+removeUnnecessaryColorsFromRows (rx:rxs) (col:cols) (s:ss) = if col == White then (removeUnnecessaryColorsFromRows (rx:rxs) cols (s:ss)) ++ (removeUnnecessaryColorsFromRows rxs (col:cols) ss)
+                                                             else do let n = sum [x1 | (x1,x2) <- rx, x2 == col]
+                                                                     let ns = sum [1 | x<-s, x == [col]]
+                                                                     if (n /= 0) && (n/=ns) then removeUnnecessaryColorsFromRows (rx:rxs) cols (s:ss)
+                                                                     else if n == 0 then removeUnnecessaryColorsFromRows (rx:rxs) cols ([filter (/=col) x | x<-s]:ss)
+                                                                          else removeUnnecessaryColorsFromRows (rx:rxs) cols (([if x == [col] then x else filter (/=col) x | x<-s]):ss)
+
+--solve the nonogram - main loop - color pallete update
+removeCompletedColors :: Nono -> [Color]
+removeCompletedColors (N _ _ _ _ [] _) = []
+removeCompletedColors (N c r cx rx (col:cols) s) = if col == White then [col] ++ removeCompletedColors (N c r cx rx cols s)
+                                                   else do let n = (sum [sum [x1 | (x1,x2) <- x, x2 == col] | x <- cx])
+                                                           let ns = sum [sum [1 | y<-x,y==[col]] | x<- s]
+                                                           if n == ns then removeCompletedColors (N c r cx rx cols s)
+                                                           else [col] ++ removeCompletedColors (N c r cx rx cols s)
