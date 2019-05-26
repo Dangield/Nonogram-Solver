@@ -96,6 +96,11 @@ putCharWithColor x c = do setSGR [SetColor Foreground Vivid c]
                           putChar x
                           setSGR [Reset]
 
+--operations on solution
+rotateSolution :: [[[Color]]] -> [[[Color]]]
+rotateSolution ([]:_) = []
+rotateSolution s = ([head x | x<-s]:rotateSolution [tail x | x<-s])
+
 --solve the nonogram - filling safe spaces
 fillSafeSpaces :: Nono -> IO ()
 fillSafeSpaces (N c r cx rx col s) = do let s1 = fillSafeSpacesInRows (N c r cx rx col s)
@@ -120,10 +125,6 @@ fillSafeSpacesInRow e ((rx1,rx2):rxs) s = if rx1 > e then (take e s) ++ (take (r
 fillSafeSpacesInCols :: Nono -> [[[Color]]]
 fillSafeSpacesInCols (N c r cx rx col s) = rotateSolution (fillSafeSpacesInRows (N r c rx cx col (rotateSolution s)))
 
-rotateSolution :: [[[Color]]] -> [[[Color]]]
-rotateSolution ([]:_) = []
-rotateSolution s = ([head x | x<-s]:rotateSolution [tail x | x<-s])
-
 --solve the nonogram - main loop
 tryForSolution :: Nono -> IO ()
 tryForSolution (N c r cx rx col s) = do putStrLn("Starting new cycle of trying for solution.")
@@ -133,9 +134,12 @@ tryForSolution (N c r cx rx col s) = do putStrLn("Starting new cycle of trying f
                                         let s2 = fillFullyFoundColors (N c r cx rx col s1)
                                         putStrLn("Solution after filling fully found colors.")
                                         printGame (N c r cx rx col s2)
+                                        let s3 = processFirstCmds (N c r cx rx col s2)
+                                        putStrLn("Solution after processing first and last cmd in each row and col.")
+                                        printGame (N c r cx rx col s3)
                                         --TODO
                                         --TODO
-                                        let col1 = removeCompletedColors (N c r cx rx col s2)
+                                        let col1 = removeCompletedColors (N c r cx rx col s3)
                                         putStr("Remaining color pallet:")
                                         putStrLn(show col1)
 
@@ -161,6 +165,23 @@ fillFullyFoundColors (N c r cx rx (col:cols) s) = if col == White then fillFully
                                                           let ns = sum [sum [length (filter (==col) y) | y<-x] | x<- s]
                                                           if n == ns then fillFullyFoundColors (N c r cx rx cols [[if filter (==col) y == [col] then [col] else y | y<-x] | x<-s])
                                                           else fillFullyFoundColors (N c r cx rx cols s)
+
+--solve the nonogram - main loop - third check, process first/last cmd in row/column
+processFirstCmds :: Nono -> [[[Color]]]
+processFirstCmds (N c r cx rx col s) = do let s1 = processFirstCmdInRows rx s
+                                          let s2 = [reverse y | y <- (processFirstCmdInRows [reverse x | x <- rx] [reverse x | x <- s1])]
+                                          let s3 = rotateSolution (processFirstCmdInRows cx (rotateSolution s2))
+                                          rotateSolution ([reverse y | y <- (processFirstCmdInRows [reverse x | x <- cx] [reverse x | x <- (rotateSolution s3)])])
+
+processFirstCmdInRows :: [[(Int,Color)]] -> [[[Color]]] -> [[[Color]]]
+processFirstCmdInRows [] [] = []
+processFirstCmdInRows (rx:rxs) (s:ss) = [processFirstCmdInRow (head rx) s] ++ processFirstCmdInRows rxs ss
+
+processFirstCmdInRow :: (Int,Color) -> [[Color]] -> [[Color]]
+processFirstCmdInRow (0,_) s = s
+processFirstCmdInRow (rx1,rx2) (s:ss) = if s == [White] then [s] ++ processFirstCmdInRow (rx1,rx2) ss
+                                        else if s == [rx2] then (take rx1 (repeat [rx2])) ++ drop (rx1-1) ss
+                                             else [s] ++ processFirstCmdInRow (rx1-1,rx2) ss
 
 --solve the nonogram - main loop - color pallete update
 removeCompletedColors :: Nono -> [Color]
