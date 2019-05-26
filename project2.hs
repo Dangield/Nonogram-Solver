@@ -130,13 +130,16 @@ tryForSolution (N c r cx rx col s) = do putStrLn("Starting new cycle of trying f
                                         let s1 = removeUnnecessaryColors (N c r cx rx col s)
                                         putStrLn("Solution after removing colors.")
                                         printGame (N c r cx rx col s1)
+                                        let s2 = fillFullyFoundColors (N c r cx rx col s1)
+                                        putStrLn("Solution after filling fully found colors.")
+                                        printGame (N c r cx rx col s2)
                                         --TODO
                                         --TODO
-                                        let col1 = removeCompletedColors (N c r cx rx col s1)
+                                        let col1 = removeCompletedColors (N c r cx rx col s2)
                                         putStr("Remaining color pallet:")
                                         putStrLn(show col1)
 
---solve the nonogram - main loop - first check
+--solve the nonogram - main loop - first check, removing impossible Color placement
 removeUnnecessaryColors :: Nono -> [[[Color]]]
 removeUnnecessaryColors (N c r cx rx col s) = rotateSolution (removeUnnecessaryColorsFromRows cx col (rotateSolution (removeUnnecessaryColorsFromRows rx col s)))
 
@@ -149,6 +152,15 @@ removeUnnecessaryColorsFromRows (rx:rxs) (col:cols) (s:ss) = if col == White the
                                                                      if (n /= 0) && (n/=ns) then removeUnnecessaryColorsFromRows (rx:rxs) cols (s:ss)
                                                                      else if n == 0 then removeUnnecessaryColorsFromRows (rx:rxs) cols ([filter (/=col) x | x<-s]:ss)
                                                                           else removeUnnecessaryColorsFromRows (rx:rxs) cols (([if x == [col] then x else filter (/=col) x | x<-s]):ss)
+
+--solve the nonogram - main loop - second check, fill color if all possible places found
+fillFullyFoundColors :: Nono -> [[[Color]]]
+fillFullyFoundColors (N _ _ _ _ [] s) = s
+fillFullyFoundColors (N c r cx rx (col:cols) s) = if col == White then fillFullyFoundColors (N c r cx rx cols s)
+                                                  else do let n = (sum [sum [x1 | (x1,x2) <- x, x2 == col] | x <- cx])
+                                                          let ns = sum [sum [length (filter (==col) y) | y<-x] | x<- s]
+                                                          if n == ns then fillFullyFoundColors (N c r cx rx cols [[if filter (==col) y == [col] then [col] else y | y<-x] | x<-s])
+                                                          else fillFullyFoundColors (N c r cx rx cols s)
 
 --solve the nonogram - main loop - color pallete update
 removeCompletedColors :: Nono -> [Color]
