@@ -101,7 +101,7 @@ rotateSolution :: [[[Color]]] -> [[[Color]]]
 rotateSolution ([]:_) = []
 rotateSolution s = ([head x | x<-s]:rotateSolution [tail x | x<-s])
 
---solve the nonogram - filling safe spaces
+--solve the nonogram - pre main loop - filling safe spaces
 fillSafeSpaces :: Nono -> IO ()
 fillSafeSpaces (N c r cx rx col s) = do let s1 = fillSafeSpacesInRows (N c r cx rx col s)
                                         putStrLn("Safe spaces in rows filled.")
@@ -127,7 +127,7 @@ fillSafeSpacesInCols (N c r cx rx col s) = rotateSolution (fillSafeSpacesInRows 
 
 --solve the nonogram - main loop
 tryForSolution :: Nono -> IO ()
-tryForSolution (N c r cx rx col s) = do putStrLn("Starting new cycle of trying for solution.")
+tryForSolution (N c r cx rx col s) = do putStrLn("--------------------------------------------------------------------------------\nStarting new cycle of trying for solution.")
                                         let s1 = removeUnnecessaryColors (N c r cx rx col s)
                                         putStrLn("Solution after removing colors.")
                                         printGame (N c r cx rx col s1)
@@ -137,11 +137,16 @@ tryForSolution (N c r cx rx col s) = do putStrLn("Starting new cycle of trying f
                                         let s3 = processFirstCmds (N c r cx rx col s2)
                                         putStrLn("Solution after processing first and last cmd in each row and col.")
                                         printGame (N c r cx rx col s3)
+                                        let s4 = processSingularCmds (N c r cx rx col s3)
+                                        putStrLn("Solution after processing lines with only one cmd.")
+                                        printGame (N c r cx rx col s4)
                                         --TODO
                                         --TODO
-                                        let col1 = removeCompletedColors (N c r cx rx col s3)
+                                        let col1 = removeCompletedColors (N c r cx rx col s4)
                                         putStr("Remaining color pallet:")
                                         putStrLn(show col1)
+                                        --if s3 /= s then tryForSolution (N c r cx rx col1 s3)
+                                        --else putStrLn("Solving completed.")
 
 --solve the nonogram - main loop - first check, removing impossible Color placement
 removeUnnecessaryColors :: Nono -> [[[Color]]]
@@ -182,6 +187,19 @@ processFirstCmdInRow (0,_) s = s
 processFirstCmdInRow (rx1,rx2) (s:ss) = if s == [White] then [s] ++ processFirstCmdInRow (rx1,rx2) ss
                                         else if s == [rx2] then (take rx1 (repeat [rx2])) ++ drop (rx1-1) ss
                                              else [s] ++ processFirstCmdInRow (rx1-1,rx2) ss
+
+--solve the nonogram - main loop - fourth check, processing lines with only one cmd
+processSingularCmds :: Nono -> [[[Color]]]
+processSingularCmds (N c r cx rx col s) = rotateSolution (processSingularCmdsInRows cx (rotateSolution (processSingularCmdsInRows rx s)))
+
+processSingularCmdsInRows :: [[(Int,Color)]] -> [[[Color]]] -> [[[Color]]]
+processSingularCmdsInRows [] [] = []
+processSingularCmdsInRows (rx:rxs) (s:ss) = if length rx /= 1 then [s]++processSingularCmdsInRows rxs ss
+                                              else do let i = elemIndices ([snd (head rx)]) s
+                                                      if i == [] then [s]++processSingularCmdsInRows rxs ss
+                                                      else do let n = 1 + (last i) - head i
+                                                              [(take ((head i)-(fst (head rx))+n) (repeat [White])) ++ (take ((fst (head rx))-n) (drop ((head i)-(fst (head rx))+n) s)) ++ 
+                                                               (take n (repeat [snd (head rx)])) ++ (take ((fst (head rx))-n) (drop (1+last i) s)) ++ (take (1+(last i)+(fst (head rx))-n) (repeat [White]))] ++ processSingularCmdsInRows rxs ss
 
 --solve the nonogram - main loop - color pallete update
 removeCompletedColors :: Nono -> [Color]
