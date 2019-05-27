@@ -139,9 +139,8 @@ tryForSolution (N c r cx rx col s) = do putStrLn("------------------------------
                                         printGame (N c r cx rx col s3)
                                         let s4 = processSingularCmds (N c r cx rx col s3)
                                         putStrLn("Solution after processing lines with only one cmd.")
+                                        --putStrLn(show s4)
                                         printGame (N c r cx rx col s4)
-                                        --TODO
-                                        --TODO
                                         let col1 = removeCompletedColors (N c r cx rx col s4)
                                         putStr("Remaining color pallet:")
                                         putStrLn(show col1)
@@ -197,12 +196,32 @@ processSingularCmds (N c r cx rx col s) = rotateSolution (processSingularCmdsInR
 
 processSingularCmdsInRows :: [[(Int,Color)]] -> [[[Color]]] -> [[[Color]]]
 processSingularCmdsInRows [] [] = []
-processSingularCmdsInRows (rx:rxs) (s:ss) = if length rx /= 1 then [s]++processSingularCmdsInRows rxs ss
+processSingularCmdsInRows (rx:rxs) (s:ss) = if length rx /= 1 then [s] ++ processSingularCmdsInRows rxs ss
                                             else do let i = elemIndices ([snd (head rx)]) s
-                                                    if i == [] then [s]++processSingularCmdsInRows rxs ss
+                                                    if i == [] then do let j = elemIndices ([White]) s
+                                                                       if j == [] then [s] ++ processSingularCmdsInRows rxs ss
+                                                                       else do let p = [head j] ++ (map (subtract 1) (zipWith (-) (tail j) (init j))) ++ [(length s) - (last j) - 1]
+                                                                               if length (filter (>= fst (head rx)) p) /= 1 || maximum p >= 2*fst (head rx) then [s]++processSingularCmdsInRows rxs ss
+                                                                               else do let m = elemIndices (maximum p) p
+                                                                                       if m == [0] then [(take ((maximum p) - fst (head rx)) s) ++
+                                                                                                         (take (2*(fst (head rx)) - maximum p) (repeat [snd (head rx)])) ++
+                                                                                                         (take ((maximum p) - fst (head rx)) (drop (fst (head rx)) s)) ++
+                                                                                                         (take ((length s) - maximum p) (repeat [White]))] ++ processSingularCmdsInRows rxs ss
+                                                                                       else if m == [(length p) - 1] then [(take ((length s) - maximum p) (repeat [White])) ++
+                                                                                                                           (take ((maximum p) - fst (head rx)) (drop ((length s) - maximum p) s)) ++
+                                                                                                                           (take (2*(fst (head rx)) - maximum p) (repeat [snd (head rx)])) ++
+                                                                                                                           (drop ((length s) - (maximum p) + fst (head rx)) s)] ++ processSingularCmdsInRows rxs ss
+                                                                                            else [(take (1 + j !! ((head m)-1)) (repeat [White])) ++
+                                                                                                  (take ((maximum p) - fst (head rx)) (drop (j !! ((head m)-1)) s)) ++
+                                                                                                  (take (2*(fst (head rx)) - maximum p) (repeat [snd (head rx)])) ++
+                                                                                                  (take ((maximum p) - fst (head rx)) (drop ((j !! ((head m)-1)) + fst (head rx)) s)) ++
+                                                                                                  (take ((length s) - (j !! (head m))) (repeat [White]))] ++ processSingularCmdsInRows rxs ss
                                                     else do let n = 1 + (last i) - head i
-                                                            [(take ((head i)-(fst (head rx))+n) (repeat [White])) ++ (take ((fst (head rx))-n) (drop ((head i)-(fst (head rx))+n) s)) ++ 
-                                                             (take n (repeat [snd (head rx)])) ++ (take ((fst (head rx))-n) (drop (1+last i) s)) ++ (take (1+(last i)+(fst (head rx))-n) (repeat [White]))] ++ processSingularCmdsInRows rxs ss
+                                                            [(take ((head i)-(fst (head rx)) + n) (repeat [White])) ++
+                                                             (take ((fst (head rx))-n) (drop ((head i)-(fst (head rx)) + n) s)) ++ 
+                                                             (take n (repeat [snd (head rx)])) ++
+                                                             (take ((fst (head rx)) - n) (drop ((head i) + n) s)) ++
+                                                             (take ((length s) - (fst (head rx)) - head i) (repeat [White]))] ++ processSingularCmdsInRows rxs ss
 
 --solve the nonogram - main loop - color pallete update
 removeCompletedColors :: Nono -> [Color]
