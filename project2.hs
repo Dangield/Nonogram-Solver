@@ -184,11 +184,24 @@ processFirstCmdInRows (rx:rxs) (s:ss) = [processFirstCmdInRow (head rx) s] ++ pr
 processFirstCmdInRow :: (Int,Color) -> [[Color]] -> [[Color]]
 processFirstCmdInRow (0,_) s = s
 processFirstCmdInRow (rx1,rx2) (s:ss) = if s == [White] then [s] ++ processFirstCmdInRow (rx1,rx2) ss
-                                        else if s == [rx2] then (take rx1 (repeat [rx2])) ++ drop (rx1-1) ss
+                                        else if s == [rx2] then (take (rx1) (repeat [rx2])) ++ drop (rx1-1) ss
                                              else do let i = elemIndices [White] (s:ss)
-                                                     if i == [] then [s] ++ processFirstCmdInRow (rx1-1,rx2) ss
-                                                     else if head i < rx1 then (take (head i) (repeat [White])) ++ processFirstCmdInRow (rx1,rx2) (drop (head i) (s:ss))
-                                                          else [s] ++ processFirstCmdInRow (rx1-1,rx2) ss
+                                                     let c = elemIndices [rx2] (s:ss)
+                                                     if i == [] && c == [] then [filter (`elem` [White,rx2]) x | x<-take rx1 (s:ss)] ++ drop (rx1-1) ss
+                                                     else if i /= [] && c == [] then if head i < rx1 then (take (head i) (repeat [White])) ++ processFirstCmdInRow (rx1,rx2) (drop (head i) (s:ss))
+                                                                                     else [filter (`elem` [White,rx2]) x | x<-take rx1 (s:ss)] ++ drop (rx1-1) ss
+                                                          else if i == [] && c /= [] then if head c >= rx1 then [filter (`elem` [White,rx2]) x | x<-take rx1 (s:ss)] ++ drop (rx1) (s:ss)
+                                                                                          else if length c == 1 || last c < rx1 then [filter (`elem` [White,rx2]) x | x<-take (head c) (s:ss)] ++ (take (rx1 - head c) (repeat [rx2])) ++ drop (rx1) (s:ss)
+                                                                                               else do let g = [x | x<-zipWith (-) (tail c) (init c)]
+                                                                                                       if head g == 1 && (length (head (group g))) + head c >= rx1 then [[White]] ++ processFirstCmdInRow (rx1,rx2) ss
+                                                                                                       else [filter (`elem` [White,rx2]) x | x<-take (head c) (s:ss)] ++ (take (rx1 - head c) (repeat [rx2])) ++ drop (rx1) (s:ss)
+                                                               else if head i < head c then if head i < rx1 then (take (head i) (repeat [White])) ++ processFirstCmdInRow (rx1,rx2) (drop (head i) (s:ss))
+                                                                                            else [filter (`elem` [White,rx2]) x | x<-take rx1 (s:ss)] ++ drop (rx1-1) ss
+                                                                    else if head c >= rx1 then [filter (`elem` [White,rx2]) x | x<-take rx1 (s:ss)] ++ drop (rx1) (s:ss)
+                                                                         else if length c == 1 || last c < rx1 then [filter (`elem` [White,rx2]) x | x<-take (head c) (s:ss)] ++ (take (rx1 - head c) (repeat [rx2])) ++ drop (rx1) (s:ss)
+                                                                              else do let g = [x | x<-zipWith (-) (tail c) (init c)]
+                                                                                      if head g == 1 && (length (head (group g))) + head c >= rx1 then [[White]] ++ processFirstCmdInRow (rx1,rx2) ss
+                                                                                      else [filter (`elem` [White,rx2]) x | x<-take (head c) (s:ss)] ++ (take (rx1 - head c) (repeat [rx2])) ++ drop (rx1) (s:ss)
 
 --solve the nonogram - main loop - fourth check, processing lines with only one cmd
 processSingularCmds :: Nono -> [[[Color]]]
