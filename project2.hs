@@ -163,12 +163,26 @@ removeUnnecessaryColorsFromRows (rx:rxs) (col:cols) (s:ss) = if col == White the
 
 --solve the nonogram - main loop - second check, fill color if all possible places found
 fillFullyFoundColors :: Nono -> [[[Color]]]
-fillFullyFoundColors (N _ _ _ _ [] s) = s
-fillFullyFoundColors (N c r cx rx (col:cols) s) = if col == White then fillFullyFoundColors (N c r cx rx cols s)
+fillFullyFoundColors (N c r cx rx col s) = fillFullyFoundColorsInSolution cx col (rotateSolution (fillFullyFoundColorsInRows cx col (rotateSolution (fillFullyFoundColorsInRows rx col s))))
+
+fillFullyFoundColorsInSolution :: [[(Int,Color)]] -> [Color] -> [[[Color]]] -> [[[Color]]]
+fillFullyFoundColorsInSolution _ [] s = s
+fillFullyFoundColorsInSolution cx (col:cols) s = if col == White then fillFullyFoundColorsInSolution cx cols s
                                                   else do let n = (sum [sum [x1 | (x1,x2) <- x, x2 == col] | x <- cx])
                                                           let ns = sum [sum [length (filter (==col) y) | y<-x] | x<- s]
-                                                          if n == ns then fillFullyFoundColors (N c r cx rx cols [[if filter (==col) y == [col] then [col] else y | y<-x] | x<-s])
-                                                          else fillFullyFoundColors (N c r cx rx cols s)
+                                                          if n == ns then fillFullyFoundColorsInSolution cx cols [[if col `elem` y then [col] else y | y<-x] | x<-s]
+                                                          else fillFullyFoundColorsInSolution cx cols s
+
+fillFullyFoundColorsInRows :: [[(Int,Color)]] -> [Color] -> [[[Color]]] ->[[[Color]]]
+fillFullyFoundColorsInRows [] _ _ = []
+fillFullyFoundColorsInRows _ [] (s:ss) = [s]
+fillFullyFoundColorsInRows (rx:rxs) (col:cols) (s:ss) = if col == White then (fillFullyFoundColorsInRows (rx:rxs) cols (s:ss)) ++ (fillFullyFoundColorsInRows rxs (col:cols) ss)
+                                                        else do let n = sum [x1 | (x1,x2) <- rx, x2 == col]
+                                                                let ns = sum [length (filter (==col) x) | x<-s]
+                                                                if (n /= 0) && (n/=ns) then fillFullyFoundColorsInRows (rx:rxs) cols (s:ss)
+                                                                else if n == 0 then fillFullyFoundColorsInRows (rx:rxs) cols (s:ss)
+                                                                     else fillFullyFoundColorsInRows (rx:rxs) cols (([if col `elem` x then [col] else x | x<-s]):ss)
+
 
 --solve the nonogram - main loop - third check, process first/last cmd in row/column
 processFirstCmds :: Nono -> [[[Color]]]
