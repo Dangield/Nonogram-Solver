@@ -239,9 +239,9 @@ processSingularCmdsInRows (rx:rxs) (s:ss) = if length rx /= 1 then [s] ++ proces
                                                                                                                            (take (2*(fst (head rx)) - maximum p) (repeat [snd (head rx)])) ++
                                                                                                                            (drop ((length s) - (maximum p) + fst (head rx)) s)] ++ processSingularCmdsInRows rxs ss
                                                                                             else [(take (1 + j !! ((head m)-1)) (repeat [White])) ++
-                                                                                                  (take ((maximum p) - fst (head rx)) (drop (j !! ((head m)-1)) s)) ++
+                                                                                                  (take ((maximum p) - fst (head rx)) (drop (1+j !! ((head m)-1)) s)) ++
                                                                                                   (take (2*(fst (head rx)) - maximum p) (repeat [snd (head rx)])) ++
-                                                                                                  (take ((maximum p) - fst (head rx)) (drop ((j !! ((head m)-1)) + fst (head rx)) s)) ++
+                                                                                                  (take ((maximum p) - fst (head rx)) (drop (1+(j !! ((head m)-1)) + fst (head rx)) s)) ++
                                                                                                   (take ((length s) - (j !! (head m))) (repeat [White]))] ++ processSingularCmdsInRows rxs ss
                                                     else do let n = 1 + (last i) - head i
                                                             [(take ((head i)-(fst (head rx)) + n) (repeat [White])) ++
@@ -313,4 +313,6 @@ checkPossibility ((rx1,rx2):rxs) (s:ss) = if s == [White] then if rx2 == White t
 
 compilePossibilities :: [[[Color]]] -> [[Color]]
 compilePossibilities ([]:_) = []
-compilePossibilities s = [sort (nub (concat [head x | x<-s]))] ++ compilePossibilities ([tail x| x<-s])
+compilePossibilities s = do let s1 = sort (nub (concat [head x | x<-s]))
+                            if elem White s1 then [[White] ++ (init s1)] ++ compilePossibilities ([tail x| x<-s])
+                            else [s1] ++ compilePossibilities ([tail x| x<-s])
