@@ -31,7 +31,7 @@ getCmdsFromStrings (s:ss) = do let args = splitOn "," s
 
 splitCmds :: [(Int,Int,Color)] -> [[(Int,Color)]]
 splitCmds [] = []
-splitCmds ((x1,x2,x3):xs) = [[(a2,a3) | (a1,a2,a3) <- ((x1,x2,x3):xs), a1 == x1]] ++ splitCmds [(a1,a2,a3) | (a1,a2,a3) <- ((x1,x2,x3):xs), a1 /= x1] 
+splitCmds ((x1,x2,x3):xs) = [[(a2,a3) | (a1,a2,a3) <- ((x1,x2,x3):xs), a1 == x1]] ++ splitCmds [(a1,a2,a3) | (a1,a2,a3) <- ((x1,x2,x3):xs), a1 /= x1]
 
 enrichCmds :: [[(Int,Color)]] -> [[(Int,Color)]]
 enrichCmds [] = []
@@ -64,7 +64,7 @@ printColsCmds c (cx:cxs) mc mr = do if length (cx:cxs) == c then putStr(take mr 
                                     else putStr("")
                                     if length cx >= mc then do let x = cx !! ((length cx)-mc)
                                                                putNumWithColor (fst x) (snd x)
-                                                               putStr(" ") 
+                                                               putStr(" ")
                                     else putStr("  ")
                                     printColsCmds c cxs mc mr
                                     if length (cx:cxs) == c then printColsCmds c (cx:cxs) (mc-1) mr
@@ -145,7 +145,7 @@ tryForSolution (N c r cx rx col s) = do putStrLn("------------------------------
                                         putStr("Remaining color pallet:")
                                         putStrLn(show col1)
                                         if s4 /= s then tryForSolution (N c r cx rx col1 s4)
-                                        else putStrLn("Solving completed.")
+                                        else countPossible (N c r cx rx col1 s4)
 
 --solve the nonogram - main loop - first check, removing impossible Color placement
 removeUnnecessaryColors :: Nono -> [[[Color]]]
@@ -245,7 +245,7 @@ processSingularCmdsInRows (rx:rxs) (s:ss) = if length rx /= 1 then [s] ++ proces
                                                                                                   (take ((length s) - (j !! (head m))) (repeat [White]))] ++ processSingularCmdsInRows rxs ss
                                                     else do let n = 1 + (last i) - head i
                                                             [(take ((head i)-(fst (head rx)) + n) (repeat [White])) ++
-                                                             (take ((fst (head rx))-n) (drop ((head i)-(fst (head rx)) + n) s)) ++ 
+                                                             (take ((fst (head rx))-n) (drop ((head i)-(fst (head rx)) + n) s)) ++
                                                              (take n (repeat [snd (head rx)])) ++
                                                              (take ((fst (head rx)) - n) (drop ((head i) + n) s)) ++
                                                              (take ((length s) - (fst (head rx)) - head i) (repeat [White]))] ++ processSingularCmdsInRows rxs ss
@@ -258,3 +258,59 @@ removeCompletedColors (N c r cx rx (col:cols) s) = if col == White then [col] ++
                                                            let ns = sum [sum [1 | y<-x,y==[col]] | x<- s]
                                                            if n == ns then removeCompletedColors (N c r cx rx cols s)
                                                            else [col] ++ removeCompletedColors (N c r cx rx cols s)
+
+-- solve the nonogram - second loop
+countPossible :: Nono -> IO ()
+countPossible (N _ _ _ _ [] _) = putStr("")
+countPossible (N c r cx rx col s) = do let possibleR = countPossibleRows s
+                                       --putStrLn(show possibleR)
+                                       let s1 = solvePossibles rx s possibleR
+                                       --putStrLn(show s1)
+                                       printGame (N c r cx rx col s1)
+                                       let possibleC = countPossibleRows (rotateSolution s1)
+                                       --putStr(show possibleC)
+                                       let s2 = rotateSolution (solvePossibles cx (rotateSolution s1) possibleC)
+                                       --putStr(show s2)
+                                       printGame (N c r cx rx col s2)
+                                       if s2 /= s then tryForSolution (N c r cx rx col s2)
+                                       else putStr("Solved")
+
+
+countPossibleRows :: [[[Color]]] -> [Int]
+countPossibleRows [] = []
+countPossibleRows (s:ss) = [product [length x | x<- s]] ++ countPossibleRows ss
+
+solvePossibles :: [[(Int, Color)]] -> [[[Color]]] -> [Int] -> [[[Color]]]
+solvePossibles rx s possibleR = if sum possibleR == length possibleR then s
+                                else do let idxR = head (elemIndices (minimum [if x == 1 then 1+(maximum possibleR) else x | x<-possibleR ]) possibleR)
+                                        let p = findPossibilitiesForRow (s!!idxR)
+                                        let p1 = removeStupidPossibilities (rx!!idxR) p
+                                        if length p1 == 1 then (take idxR s) ++ p1 ++ drop (idxR +1) s
+                                        else if p == p1 then solvePossibles rx s ((take idxR possibleR) ++ [1] ++ drop (idxR+1) possibleR)
+                                             else do let s1 = compilePossibilities p1
+                                                     if (s!!idxR) == s1 then solvePossibles rx s ((take idxR possibleR) ++ [1] ++ drop (idxR+1) possibleR)
+                                                     else (take idxR s) ++ [s1] ++ (drop (idxR+1) s)
+
+findPossibilitiesForRow :: [[Color]] -> [[[Color]]]
+findPossibilitiesForRow s = do let n = findIndices (>1) [length x | x<-s]
+                               if n == [] then [s]
+                               else concat (map findPossibilitiesForRow [(take (head n) s) ++ [[x]] ++ drop (1+head n) s | x <- s!!(head n)])
+
+removeStupidPossibilities :: [(Int,Color)] -> [[[Color]]] -> [[[Color]]]
+removeStupidPossibilities rx [] = []
+removeStupidPossibilities rx (s:ss) = if checkPossibility rx s then [s] ++ removeStupidPossibilities rx ss
+                                      else removeStupidPossibilities rx ss
+
+checkPossibility :: [(Int,Color)] -> [[Color]] -> Bool
+checkPossibility _ [] = True
+checkPossibility [] (s:ss) = if s == [White] then checkPossibility [] ss
+                             else False
+checkPossibility ((rx1,rx2):rxs) (s:ss) = if s == [White] then if rx2 == White then checkPossibility rxs ss
+                                                               else checkPossibility ((rx1,rx2):rxs) ss
+                                          else if s /= [rx2] then False
+                                               else if rx1 == length (takeWhile (==[rx2]) (s:ss)) then checkPossibility rxs (drop rx1 (s:ss))
+                                                    else False
+
+compilePossibilities :: [[[Color]]] -> [[Color]]
+compilePossibilities ([]:_) = []
+compilePossibilities s = [sort (nub (concat [head x | x<-s]))] ++ compilePossibilities ([tail x| x<-s])
